@@ -3,6 +3,10 @@ name: Deploy Frontend to GitHub Pages
 on:
   push:
     branches: [main]
+    paths:
+      - 'website/**'
+      - 'dashboard/**'
+      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -28,24 +32,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
-          cache-dependency-path: dashboard/package.json
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
 
-      - name: Install dependencies
+      - name: Install dashboard dependencies
         run: npm --prefix dashboard ci
 
-      - name: Build frontend
+      - name: Build authenticated dashboard
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
         run: npm --prefix dashboard run build
 
+      - name: Assemble public site and dashboard
+        run: |
+          mkdir -p public-site/app
+          cp website/index.html public-site/index.html
+          cp -R dashboard/dist/. public-site/app/
+          touch public-site/.nojekyll
+          test -s public-site/index.html
+          test -s public-site/app/index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dashboard/dist
+          path: public-site
 
       - name: Deploy to GitHub Pages
         id: deployment
