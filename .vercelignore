@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+.pytest_cache
+.ruff_cache
+tests
+evals
+dashboard/node_modules
+dashboard/dist
+*.db
+credentials.json
+token.json
+client_secret*.json
+AI_HANDOFF.md
+Tracker.md

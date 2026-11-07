@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ShieldAlert } from 'lucide-react';
+import { Lock, ShieldAlert, Server } from 'lucide-react';
 import { api } from '../api';
 
 interface LoginModalProps {
@@ -9,6 +9,12 @@ interface LoginModalProps {
 export const LoginModal: React.FC<LoginModalProps> = ({ onSuccess }) => {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
+  const [apiUrl, setApiUrl] = useState(api.getBaseUrl());
+  const [showConfig, setShowConfig] = useState(
+    !api.getBaseUrl() &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1'
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,11 +24,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onSuccess }) => {
     setLoading(true);
 
     try {
+      if (apiUrl) {
+        api.setBaseUrl(apiUrl);
+      }
       api.setCredentials(username, password);
       await api.verifyAuth();
       onSuccess();
     } catch (err: any) {
-      setError(err.message || 'Invalid username or password');
+      setError(err.message || 'Invalid credentials or unreachable backend server');
     } finally {
       setLoading(false);
     }
@@ -74,6 +83,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({ onSuccess }) => {
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
               placeholder="••••••••••••"
             />
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowConfig(!showConfig)}
+              className="text-xs text-slate-500 hover:text-slate-800 flex items-center space-x-1.5 transition-colors"
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>{showConfig ? 'Hide Backend Server URL' : 'Configure Backend Server URL'}</span>
+            </button>
+            {showConfig && (
+              <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  API Base URL
+                </label>
+                <input
+                  type="url"
+                  value={apiUrl}
+                  onChange={(e) => setApiUrl(e.target.value)}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded bg-white text-xs font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="https://your-backend.vercel.app"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Enter your Vercel backend deployment URL (e.g. https://xyz.vercel.app).
+                </p>
+              </div>
+            )}
           </div>
 
           <button

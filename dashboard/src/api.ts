@@ -60,6 +60,27 @@ export interface KBEntry {
 
 class ApiClient {
   private authHeader: string | null = null;
+  private baseUrl: string = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+
+  constructor() {
+    const savedUrl = localStorage.getItem('rh_api_url');
+    if (savedUrl) {
+      this.baseUrl = savedUrl.trim().replace(/\/+$/, '');
+    }
+  }
+
+  setBaseUrl(url: string) {
+    this.baseUrl = url.trim().replace(/\/+$/, '');
+    if (this.baseUrl) {
+      localStorage.setItem('rh_api_url', this.baseUrl);
+    } else {
+      localStorage.removeItem('rh_api_url');
+    }
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
 
   setCredentials(user: string, pass: string) {
     this.authHeader = 'Basic ' + btoa(`${user}:${pass}`);
@@ -91,7 +112,11 @@ class ApiClient {
     }
     headers.set('Accept', 'application/json');
 
-    const res = await fetch(endpoint, { ...options, headers });
+    const url = endpoint.startsWith('http')
+      ? endpoint
+      : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+
+    const res = await fetch(url, { ...options, headers });
     if (res.status === 401) {
       this.clearCredentials();
       throw new Error('Unauthorized: Please log in');

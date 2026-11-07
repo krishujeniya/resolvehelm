@@ -1,6 +1,7 @@
 """FastAPI Application entrypoint for ResolveHelm Admin API and dashboard backend."""
 
 import logging
+import os
 import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -40,16 +41,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware for local dashboard development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"]
-    if settings.APP_ENV != "production"
-    else ["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware supporting local development, Vercel deployments, and GitHub Pages
+cors_origins_raw = getattr(settings, "CORS_ALLOWED_ORIGINS", "*").strip()
+if cors_origins_raw == "*":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    allowed_list = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_list,
+        allow_origin_regex=r"^https://.*\.github\.io$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 security = HTTPBasic()
 
@@ -347,10 +358,23 @@ async def trigger_manual_poll(_: str = Depends(require_auth)) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------------------
-# Serve Production Dashboard Assets
+# Serve Production Dashboard Assets or Root API Info
 # ------------------------------------------------------------------------------
 dashboard_dist = Path(__file__).resolve().parent.parent / "dashboard" / "dist"
-if dashboard_dist.exists():
+if dashboard_dist.exists() and not bool(os.environ.get("VERCEL")):
     app.mount(
         "/", StaticFiles(directory=str(dashboard_dist), html=True), name="dashboard"
     )
+else:
+
+    @app.get("/", tags=["System"])
+    async def root_discovery() -> dict[str, Any]:
+        """Root discovery endpoint for serverless and headless deployments."""
+        return {
+            "service": "ResolveHelm API",
+            "status": "healthy",
+            "version": "0.1.0",
+            "environment": settings.APP_ENV,
+            "docs": "/docs",
+            "health": "/health",
+        }

@@ -65,6 +65,12 @@ class Settings(BaseSettings):
         default="change-me-to-a-secure-password", min_length=6
     )
 
+    # CORS Settings
+    CORS_ALLOWED_ORIGINS: str = Field(
+        default="*",
+        description="Allowed CORS origins comma-separated or '*' for wildcard",
+    )
+
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

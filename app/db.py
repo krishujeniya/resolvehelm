@@ -823,6 +823,28 @@ def _is_pg_reachable(dsn: str, timeout: float = 0.5) -> bool:
         return False
 
 
+def _resolve_sqlite_path(default_path: str = "resolvehelm.db") -> str:
+    """Resolve sqlite path, ensuring writable /tmp directory in serverless environments like Vercel."""
+    import os
+    from pathlib import Path
+
+    if os.environ.get("VERCEL"):
+        tmp_path = Path("/tmp/resolvehelm.db")
+        if not tmp_path.exists():
+            candidate = Path(default_path)
+            if not candidate.is_absolute():
+                candidate = Path(__file__).resolve().parent.parent / default_path
+            if candidate.exists():
+                import shutil
+
+                try:
+                    shutil.copyfile(candidate, tmp_path)
+                except Exception:
+                    pass
+        return str(tmp_path)
+    return default_path
+
+
 def get_db() -> BaseDatabase:
     """Retrieve database instance."""
     global _db_instance
@@ -832,6 +854,7 @@ def get_db() -> BaseDatabase:
         ):
             _db_instance = SQLiteMemoryDatabase()
         else:
+            sqlite_path = _resolve_sqlite_path("resolvehelm.db")
             if _is_pg_reachable(settings.DATABASE_URL):
                 try:
                     pg_db = PostgresDatabase(settings.DATABASE_URL)
@@ -841,17 +864,18 @@ def get_db() -> BaseDatabase:
                         logger.info(
                             "Postgres health check failed; using SQLite fallback"
                         )
-                        _db_instance = SQLiteMemoryDatabase("resolvehelm.db")
+                        _db_instance = SQLiteMemoryDatabase(sqlite_path)
                 except Exception as e:
                     logger.info(
                         "Failed to connect to Postgres (%s); using SQLite fallback", e
                     )
-                    _db_instance = SQLiteMemoryDatabase("resolvehelm.db")
+                    _db_instance = SQLiteMemoryDatabase(sqlite_path)
             else:
                 logger.info(
-                    "Postgres host not reachable; using SQLite fallback (resolvehelm.db)"
+                    "Postgres host not reachable; using SQLite fallback (%s)",
+                    sqlite_path,
                 )
-                _db_instance = SQLiteMemoryDatabase("resolvehelm.db")
+                _db_instance = SQLiteMemoryDatabase(sqlite_path)
     return _db_instance
 
 
