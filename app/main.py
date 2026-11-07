@@ -3,6 +3,7 @@
 import logging
 import os
 import secrets
+import urllib.parse
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -61,6 +62,38 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+class VercelPathRewriteMiddleware:
+    """ASGI middleware to normalize Vercel serverless path rewrites."""
+
+    def __init__(self, asgi_app: Any) -> None:
+        self.asgi_app = asgi_app
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            raw_query = scope.get("query_string", b"").decode("latin1")
+            query_params = urllib.parse.parse_qs(raw_query)
+            if "__path__" in query_params:
+                forwarded_path = query_params["__path__"][0]
+                if not forwarded_path.startswith("/"):
+                    forwarded_path = "/" + forwarded_path
+                scope["path"] = forwarded_path
+                scope["raw_path"] = forwarded_path.encode("latin1")
+                scope["root_path"] = ""
+                del query_params["__path__"]
+                scope["query_string"] = urllib.parse.urlencode(
+                    query_params, doseq=True
+                ).encode("latin1")
+            elif scope.get("path", "").startswith("/api/index.py"):
+                clean_path = scope["path"][len("/api/index.py") :] or "/"
+                scope["path"] = clean_path
+                scope["raw_path"] = clean_path.encode("latin1")
+                scope["root_path"] = ""
+        await self.asgi_app(scope, receive, send)
+
+
+app.add_middleware(VercelPathRewriteMiddleware)
 
 security = HTTPBasic()
 
