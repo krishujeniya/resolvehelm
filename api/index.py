@@ -24,6 +24,8 @@ async def app(scope, receive, send):
             if not forwarded_path.startswith("/"):
                 forwarded_path = "/" + forwarded_path
             scope["path"] = forwarded_path
+            scope["raw_path"] = forwarded_path.encode("latin1")
+            scope["root_path"] = ""
 
             # Clean __path__ out of query string so route handlers receive pristine query params
             del query_params["__path__"]

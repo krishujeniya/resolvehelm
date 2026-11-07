@@ -82,6 +82,21 @@ def require_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     return credentials.username
 
 
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Diagnostic 404 handler to reveal path routing in serverless runtimes."""
+    return JSONResponse(
+        status_code=404,
+        content={
+            "detail": "Not Found",
+            "path": request.url.path,
+            "scope_path": request.scope.get("path"),
+            "scope_root_path": request.scope.get("root_path"),
+            "query_params": dict(request.query_params),
+        },
+    )
+
+
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Safe global exception handler avoiding internal leak in production."""
