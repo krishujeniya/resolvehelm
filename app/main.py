@@ -478,10 +478,9 @@ async def simulate_incoming_email(
             author="System (Policy Engine)",
         )
 
-    db.record_event(
-        message_id=sim_message_id,
-        status="processed",
-        attempts=1,
+    db.claim_event(sim_message_id)
+    db.complete_event(
+        sim_message_id,
         result={
             "action": decision.action,
             "section": decision.section,
