@@ -33,6 +33,8 @@ dialog{width:min(510px,calc(100% - 32px));max-width:none;border:1px solid rgba(1
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important}.hero{height:auto;min-height:100svh;margin-top:0}.hero-sticky{position:relative;height:auto;min-height:100svh}.second,.counter,.scroll-hint{display:none!important}.first{opacity:1!important;visibility:visible!important;transform:none!important}html.js .reveal.pending{opacity:1;transform:none;filter:none}.progress{display:none}}
 html.motion-off *,html.motion-off *:before,html.motion-off *:after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 @media print{.hero-canvas,.fallback,.hero-controls,.banner,.progress,.scroll-hint,.menu-button,.toast{display:none}.hero{height:auto;min-height:0}.hero-sticky{position:relative;height:auto}.section{padding:50px 0}body{background:white;color:black}p{color:#333}}
+
+html:not(.js) .hero-canvas,html:not(.js) .scroll-hint,html:not(.js) .hero-controls,html:not(.js) .counter,html:not(.js) .tabs{display:none}html:not(.js) .hero{height:auto;min-height:100svh}html:not(.js) .hero-sticky{position:relative;height:auto;min-height:100svh}html:not(.js) .second{display:none}html:not(.js) .mobile-nav{display:flex;position:static}
 </style>
 </head>
 <body>
@@ -93,7 +95,7 @@ html.motion-off *,html.motion-off *:before,html.motion-off *:after{animation-dur
 </main>
 <dialog id="demo-dialog" aria-labelledby="dialog-title"><div class="dialog-inner"><div class="dialog-top"><span class="example">Local illustrative walkthrough</span><button id="demo-close" aria-label="Close example">✕</button></div><h2 id="dialog-title">A decision, in view.</h2><p>This illustration changes text on the page. It never collects customer information or sends messages.</p><div class="dialog-status" id="dialog-status" role="status" aria-live="polite">Ready to inspect an example.</div><div class="actions"><button class="pill pill-primary" id="replay">Replay ↻</button><button class="pill pill-ghost" id="demo-done">Close</button></div></div></dialog>
 <div class="toast" id="toast" aria-live="polite" role="status"></div>
-<noscript><style>.hero-canvas,.scroll-hint,.hero-controls,.counter,.tabs{display:none}.hero{height:auto;min-height:100svh}.hero-sticky{position:relative;height:auto;min-height:100svh}.second{display:none}.mobile-nav{display:flex;position:static}</style></noscript>
+<noscript><p class="wrap">Interactive examples and visual effects require JavaScript. All product information remains visible.</p></noscript>
 <script>
 (function(){
 'use strict';
