@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TicketItem, MessageItem, TicketNote, api } from '../api';
+import { SimulateModal } from '../components/SimulateModal';
 import {
   User,
   Bot,
@@ -11,7 +12,8 @@ import {
   MessageSquare,
   Plus,
   RotateCcw,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 
 interface TicketsPageProps {
@@ -34,6 +36,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ tickets, loading, onRe
   const [addingNote, setAddingNote] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showSimulateModal, setShowSimulateModal] = useState(false);
 
   useEffect(() => {
     if (selectedTicket) {
@@ -171,6 +174,15 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ tickets, loading, onRe
           <p className="text-sm text-slate-500">
             Inbound customer threads, human escalation triage, manual replies, and internal notes.
           </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowSimulateModal(true)}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow-sm transition"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Simulate Inbound Email</span>
+          </button>
         </div>
         {feedbackMsg && (
           <div
@@ -462,6 +474,24 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ tickets, loading, onRe
           </div>
         )}
       </div>
+
+      {showSimulateModal && (
+        <SimulateModal
+          onClose={() => setShowSimulateModal(false)}
+          onSuccess={async (ticketId) => {
+            if (onRefresh) onRefresh();
+            try {
+              const t = await api.getTickets();
+              const found = t.find((item) => item.id === ticketId);
+              if (found) {
+                handleSelectTicket(found);
+              }
+            } catch (err) {
+              console.error('Failed to select simulated ticket:', err);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

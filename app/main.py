@@ -360,7 +360,16 @@ async def add_ticket_note_endpoint(
 async def list_knowledge_base(_: str = Depends(require_auth)) -> list[dict[str, Any]]:
     """Retrieve all policy entries across all knowledge base sections."""
     db = get_db()
-    return db.get_all_kb_entries()
+    entries = db.get_all_kb_entries()
+    if not entries:
+        try:
+            from scripts.seed_kb import seed_knowledge_base
+
+            seed_knowledge_base()
+            entries = db.get_all_kb_entries()
+        except Exception as e:
+            logger.warning("Could not auto-seed knowledge base: %s", e)
+    return entries
 
 
 class KnowledgeBaseUpdateRequest(BaseModel):
@@ -403,6 +412,95 @@ async def trigger_manual_poll(_: str = Depends(require_auth)) -> dict[str, Any]:
 
     count = await poll_once()
     return {"status": "ok", "processed": count}
+
+
+class SimulateEmailRequest(BaseModel):
+    sender_name: str = "Mia Jansen"
+    sender_email: str = "mia@example.com"
+    subject: str = "Still losing air"
+    body: str = "I completed the valve check with soapy water and tightened the valve core, but it is still losing air."
+    has_attachments: bool = False
+
+
+@app.post("/api/simulate", tags=["Simulation"])
+async def simulate_incoming_email(
+    payload: SimulateEmailRequest,
+    _: str = Depends(require_auth),
+) -> dict[str, Any]:
+    """Simulate an incoming support email, run policy & AI triage, create ticket and record event."""
+    from app.ai.decide import decide
+
+    db = get_db()
+    sim_thread_id = f"sim-{secrets.token_hex(6)}"
+    sim_message_id = f"msg-{secrets.token_hex(6)}"
+
+    formatted_thread = (
+        f"From: {payload.sender_name} <{payload.sender_email}>\n"
+        f"Subject: {payload.subject}\n\n"
+        f"{payload.body}"
+    )
+
+    decision = await decide(formatted_thread, has_attachments=payload.has_attachments)
+
+    initial_status = "escalated" if decision.action == "escalate" else "open"
+    ticket_id = db.upsert_ticket(
+        thread_id=sim_thread_id,
+        customer=f"{payload.sender_name} <{payload.sender_email}>",
+        subject=payload.subject,
+        category=decision.section or "general",
+        status=initial_status,
+    )
+
+    db.save_message(
+        ticket_id=ticket_id,
+        message_id=sim_message_id,
+        direction="incoming",
+        sender=f"{payload.sender_name} <{payload.sender_email}>",
+        recipient="support@harborandpine.com",
+        body=payload.body,
+    )
+
+    if decision.action == "reply" and decision.reply:
+        reply_msg_id = f"reply-{secrets.token_hex(6)}"
+        db.save_message(
+            ticket_id=ticket_id,
+            message_id=reply_msg_id,
+            direction="outgoing",
+            sender="Harbor & Pine AI Support",
+            recipient=payload.sender_email,
+            body=decision.reply,
+        )
+        db.update_ticket(ticket_id=ticket_id, status="answered")
+    elif decision.action == "escalate":
+        db.add_ticket_note(
+            ticket_id=ticket_id,
+            note=f"Escalated by Policy Engine: {decision.reason} (Proposed Action: {decision.proposed_action or 'human review'})",
+            author="System (Policy Engine)",
+        )
+
+    db.record_event(
+        message_id=sim_message_id,
+        status="processed",
+        attempts=1,
+        result={
+            "action": decision.action,
+            "section": decision.section,
+            "reason": decision.reason,
+            "proposed_action": decision.proposed_action,
+        },
+    )
+
+    return {
+        "status": "success",
+        "ticket_id": ticket_id,
+        "decision": {
+            "action": decision.action,
+            "section": decision.section,
+            "reply": decision.reply,
+            "reason": decision.reason,
+            "proposed_action": decision.proposed_action,
+        },
+    }
 
 
 # ------------------------------------------------------------------------------

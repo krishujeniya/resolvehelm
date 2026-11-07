@@ -187,6 +187,30 @@ class ApiClient {
       body: JSON.stringify({ note }),
     });
   }
+
+  async simulateEmail(payload: {
+    sender_name: string;
+    sender_email: string;
+    subject: string;
+    body: string;
+    has_attachments?: boolean;
+  }): Promise<{
+    status: string;
+    ticket_id: string;
+    decision: {
+      action: 'reply' | 'escalate';
+      section: string;
+      reply?: string;
+      reason: string;
+      proposed_action?: string;
+    };
+  }> {
+    return this.request('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export const api = new ApiClient();
