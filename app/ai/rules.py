@@ -117,6 +117,7 @@ def evaluate_paddle_board_rules(
     if (
         "leak" in text_lower
         or "loses air" in text_lower
+        or "losing air" in text_lower
         or "soft every morning" in text_lower
         or "losing pressure" in text_lower
     ):
@@ -300,7 +301,13 @@ def evaluate_shelving_rules(
         or "bolts" in text_lower
         or "fastener" in text_lower
     ):
-        if "missing" in text_lower or "not enough" in text_lower:
+        if (
+            "missing" in text_lower
+            or "not enough" in text_lower
+            or "without" in text_lower
+            or "no screws" in text_lower
+            or "not in the box" in text_lower
+        ):
             if order_num:
                 reply = (
                     f"Hi {sender_name or 'there'},\n\n"
