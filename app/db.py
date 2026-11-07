@@ -69,6 +69,20 @@ class BaseDatabase:
     def get_ticket_messages(self, ticket_id: str) -> list[dict[str, Any]]:
         raise NotImplementedError
 
+    def update_ticket(
+        self,
+        ticket_id: str,
+        status: str | None = None,
+        assigned_to: str | None = None,
+    ) -> bool:
+        raise NotImplementedError
+
+    def add_ticket_note(self, ticket_id: str, note: str, author: str) -> str:
+        raise NotImplementedError
+
+    def get_ticket_notes(self, ticket_id: str) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
     def list_recent_events(
         self, limit: int = 50, offset: int = 0
     ) -> list[dict[str, Any]]:
@@ -122,12 +136,22 @@ class SQLiteMemoryDatabase(BaseDatabase):
                     customer TEXT NOT NULL,
                     subject TEXT NOT NULL,
                     category TEXT NOT NULL DEFAULT 'general',
-                    status TEXT NOT NULL CHECK (status IN ('open', 'answered', 'escalated', 'closed')),
+                    status TEXT NOT NULL CHECK (status IN ('open', 'answered', 'escalated', 'closed', 'resolved')),
                     proposed_action TEXT,
+                    assigned_to TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_tickets_th ON tickets(thread_id);
+
+                CREATE TABLE IF NOT EXISTS ticket_notes (
+                    id TEXT PRIMARY KEY,
+                    ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+                    author TEXT NOT NULL,
+                    note TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_ticket_notes_tid ON ticket_notes(ticket_id);
 
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
@@ -151,6 +175,11 @@ class SQLiteMemoryDatabase(BaseDatabase):
                 );
                 CREATE INDEX IF NOT EXISTS idx_kb_sec ON knowledge_base(section);
             """)
+            cur = self.conn.cursor()
+            cur.execute("PRAGMA table_info(tickets)")
+            cols = [r["name"] for r in cur.fetchall()]
+            if "assigned_to" not in cols:
+                cur.execute("ALTER TABLE tickets ADD COLUMN assigned_to TEXT")
 
     def check_health(self) -> bool:
         try:
@@ -325,6 +354,47 @@ class SQLiteMemoryDatabase(BaseDatabase):
         cur = self.conn.cursor()
         cur.execute(
             "SELECT * FROM messages WHERE ticket_id = ? ORDER BY created_at ASC",
+            (ticket_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+    def update_ticket(
+        self,
+        ticket_id: str,
+        status: str | None = None,
+        assigned_to: str | None = None,
+    ) -> bool:
+        with self.conn:
+            cur = self.conn.cursor()
+            updates = ["updated_at = ?"]
+            params = [_now_iso()]
+            if status is not None:
+                updates.append("status = ?")
+                params.append(status)
+            if assigned_to is not None:
+                updates.append("assigned_to = ?")
+                params.append(assigned_to)
+            params.append(ticket_id)
+            cur.execute(
+                f"UPDATE tickets SET {', '.join(updates)} WHERE id = ?",
+                params,
+            )
+            return cur.rowcount > 0
+
+    def add_ticket_note(self, ticket_id: str, note: str, author: str) -> str:
+        note_id = str(uuid.uuid4())
+        with self.conn:
+            cur = self.conn.cursor()
+            cur.execute(
+                "INSERT INTO ticket_notes (id, ticket_id, author, note, created_at) VALUES (?, ?, ?, ?, ?)",
+                (note_id, ticket_id, author, note, _now_iso()),
+            )
+        return note_id
+
+    def get_ticket_notes(self, ticket_id: str) -> list[dict[str, Any]]:
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT * FROM ticket_notes WHERE ticket_id = ? ORDER BY created_at DESC",
             (ticket_id,),
         )
         return [dict(r) for r in cur.fetchall()]
@@ -550,7 +620,7 @@ class PostgresDatabase(BaseDatabase):
         with self._get_pool().connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id::text, thread_id, customer, subject, category, status, proposed_action, created_at, updated_at FROM tickets WHERE id = %s",
+                    "SELECT id::text, thread_id, customer, subject, category, status, proposed_action, assigned_to, created_at, updated_at FROM tickets WHERE id = %s",
                     (ticket_id,),
                 )
                 row = cur.fetchone()
@@ -563,7 +633,7 @@ class PostgresDatabase(BaseDatabase):
         with self._get_pool().connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id::text, thread_id, customer, subject, category, status, proposed_action, created_at, updated_at FROM tickets WHERE thread_id = %s",
+                    "SELECT id::text, thread_id, customer, subject, category, status, proposed_action, assigned_to, created_at, updated_at FROM tickets WHERE thread_id = %s",
                     (thread_id,),
                 )
                 row = cur.fetchone()
@@ -576,7 +646,7 @@ class PostgresDatabase(BaseDatabase):
         with self._get_pool().connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id::text, thread_id, customer, subject, category, status, proposed_action, created_at, updated_at FROM tickets ORDER BY updated_at DESC LIMIT %s OFFSET %s",
+                    "SELECT id::text, thread_id, customer, subject, category, status, proposed_action, assigned_to, created_at, updated_at FROM tickets ORDER BY updated_at DESC LIMIT %s OFFSET %s",
                     (limit, offset),
                 )
                 cols = [c.name for c in cur.description]
@@ -587,6 +657,60 @@ class PostgresDatabase(BaseDatabase):
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT id::text, ticket_id::text, message_id, direction, sender, recipient, body, created_at FROM messages WHERE ticket_id = %s ORDER BY created_at ASC",
+                    (ticket_id,),
+                )
+                cols = [c.name for c in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    def update_ticket(
+        self,
+        ticket_id: str,
+        status: str | None = None,
+        assigned_to: str | None = None,
+    ) -> bool:
+        with self._get_pool().connection() as conn:
+            with conn.cursor() as cur:
+                updates = ["updated_at = NOW()"]
+                params: list[Any] = []
+                if status is not None:
+                    updates.append("status = %s")
+                    params.append(status)
+                if assigned_to is not None:
+                    updates.append("assigned_to = %s")
+                    params.append(assigned_to)
+                params.append(ticket_id)
+                cur.execute(
+                    f"UPDATE tickets SET {', '.join(updates)} WHERE id = %s",
+                    params,
+                )
+                conn.commit()
+                return cur.rowcount > 0
+
+    def add_ticket_note(self, ticket_id: str, note: str, author: str) -> str:
+        with self._get_pool().connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO ticket_notes (ticket_id, author, note, created_at)
+                    VALUES (%s, %s, %s, NOW())
+                    RETURNING id::text
+                    """,
+                    (ticket_id, author, note),
+                )
+                note_id = cur.fetchone()[0]
+                conn.commit()
+                return str(note_id)
+
+    def get_ticket_notes(self, ticket_id: str) -> list[dict[str, Any]]:
+        with self._get_pool().connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id::text, ticket_id::text, author, note, created_at
+                    FROM ticket_notes
+                    WHERE ticket_id = %s
+                    ORDER BY created_at DESC
+                    """,
                     (ticket_id,),
                 )
                 cols = [c.name for c in cur.description]

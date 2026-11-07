@@ -139,3 +139,35 @@ def test_knowledge_base_operations(db):
     )
     updated = db.get_kb_entry_by_id(entry1_id)
     assert updated["content"] == "Updated sizing guide"
+
+
+def test_ticket_status_update_and_notes(db):
+    ticket_id = db.upsert_ticket(
+        thread_id="th-db-ops",
+        customer="ops@example.com",
+        subject="Notes and status test",
+        category="paddle-boards",
+        status="open",
+    )
+
+    # Update status to resolved and assign
+    success = db.update_ticket(ticket_id, status="resolved", assigned_to="operator_bob")
+    assert success is True
+
+    ticket = db.get_ticket(ticket_id)
+    assert ticket["status"] == "resolved"
+    assert ticket["assigned_to"] == "operator_bob"
+
+    # Add notes
+    note1_id = db.add_ticket_note(
+        ticket_id, note="Customer confirmed replacement received", author="bob"
+    )
+    assert note1_id is not None
+    note2_id = db.add_ticket_note(
+        ticket_id, note="Closing ticket after confirmation", author="bob"
+    )
+    assert note2_id != note1_id
+
+    notes = db.get_ticket_notes(ticket_id)
+    assert len(notes) == 2
+    assert notes[0]["author"] == "bob"

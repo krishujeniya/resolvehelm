@@ -7,7 +7,7 @@ from pydantic_ai import Agent
 
 from app.ai.rules import check_mandatory_escalation
 from app.ai.schemas import Classification
-from app.config import settings
+from app.config import resolve_provider_model, settings
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +32,8 @@ Determine:
 
 def get_classifier_agent() -> Agent[None, Classification]:
     """Initialize Pydantic AI classifier agent."""
-    model_name = settings.CLASSIFIER_MODEL
-    # If using anthropic provider
-    provider_model = (
-        f"anthropic:{model_name}"
-        if not model_name.startswith("anthropic:")
-        else model_name
+    provider_model = resolve_provider_model(
+        settings.CLASSIFIER_MODEL, settings.AI_PROVIDER
     )
     return Agent(
         model=provider_model,
@@ -125,14 +121,19 @@ async def classify_email(email_text: str, subject: str = "") -> Classification:
         fallback.reason = reason
         return fallback
 
-    # If Anthropic API key is not configured or in testing environment, use offline fallback
-    if not settings.ANTHROPIC_API_KEY or settings.APP_ENV == "testing":
+    # If active provider API key is not configured or in testing environment, use offline fallback
+    has_api_key = (
+        (settings.AI_PROVIDER == "anthropic" and bool(settings.ANTHROPIC_API_KEY))
+        or (settings.AI_PROVIDER == "gemini" and bool(settings.GEMINI_API_KEY))
+        or (settings.AI_PROVIDER == "openai" and bool(settings.OPENAI_API_KEY))
+    )
+    if not has_api_key or settings.APP_ENV == "testing":
         return classify_offline_fallback(email_text, subject)
 
     try:
         agent = get_classifier_agent()
         result = await agent.run(f"Subject: {subject}\n\n{email_text}")
-        return result.data
+        return getattr(result, "output", getattr(result, "data", None))
     except Exception as e:
         logger.warning(
             "Classifier model call failed (%s); using deterministic fallback", e

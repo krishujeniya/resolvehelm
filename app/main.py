@@ -5,7 +5,7 @@ import secrets
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -192,6 +192,109 @@ async def get_ticket_messages(
             status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
         )
     return db.get_ticket_messages(ticket_id)
+
+
+class TicketUpdateRequest(BaseModel):
+    status: Literal["open", "answered", "escalated", "closed", "resolved"] | None = None
+    assigned_to: str | None = None
+
+
+@app.patch("/api/tickets/{ticket_id}", tags=["Tickets"])
+async def update_ticket_endpoint(
+    ticket_id: str,
+    payload: TicketUpdateRequest,
+    _: str = Depends(require_auth),
+) -> dict[str, Any]:
+    """Update ticket status and operator assignment."""
+    db = get_db()
+    ticket = db.get_ticket(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        )
+    success = db.update_ticket(
+        ticket_id=ticket_id,
+        status=payload.status,
+        assigned_to=payload.assigned_to,
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update ticket",
+        )
+    updated = db.get_ticket(ticket_id)
+    return {"status": "updated", "ticket": updated}
+
+
+class TicketManualReplyRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=50000)
+
+
+@app.post("/api/tickets/{ticket_id}/reply", tags=["Tickets"])
+async def send_manual_ticket_reply(
+    ticket_id: str,
+    payload: TicketManualReplyRequest,
+    user: str = Depends(require_auth),
+) -> dict[str, Any]:
+    """Send an operator manual response to the customer thread."""
+    db = get_db()
+    ticket = db.get_ticket(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        )
+
+    msg_id = f"manual-{secrets.token_hex(8)}"
+    db.save_message(
+        ticket_id=ticket_id,
+        message_id=msg_id,
+        direction="outgoing",
+        sender=f"support ({user})",
+        recipient=ticket["customer"],
+        body=payload.body,
+    )
+    db.update_ticket(ticket_id=ticket_id, status="answered")
+    return {"status": "sent", "message_id": msg_id}
+
+
+class TicketNoteCreateRequest(BaseModel):
+    note: str = Field(min_length=1, max_length=10000)
+
+
+@app.get("/api/tickets/{ticket_id}/notes", tags=["Tickets"])
+async def get_ticket_notes_endpoint(
+    ticket_id: str,
+    _: str = Depends(require_auth),
+) -> list[dict[str, Any]]:
+    """Retrieve internal operator notes for a ticket."""
+    db = get_db()
+    ticket = db.get_ticket(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        )
+    return db.get_ticket_notes(ticket_id)
+
+
+@app.post("/api/tickets/{ticket_id}/notes", tags=["Tickets"])
+async def add_ticket_note_endpoint(
+    ticket_id: str,
+    payload: TicketNoteCreateRequest,
+    user: str = Depends(require_auth),
+) -> dict[str, Any]:
+    """Record an internal support note on a ticket."""
+    db = get_db()
+    ticket = db.get_ticket(ticket_id)
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        )
+    note_id = db.add_ticket_note(
+        ticket_id=ticket_id,
+        note=payload.note,
+        author=user,
+    )
+    return {"status": "created", "note_id": note_id}
 
 
 @app.get("/api/knowledge-base", tags=["Knowledge Base"])

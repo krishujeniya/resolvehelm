@@ -43,7 +43,13 @@ class Settings(BaseSettings):
     )
 
     # AI Models
+    AI_PROVIDER: Literal["anthropic", "gemini", "openai"] = Field(
+        default="anthropic",
+        description="Active AI model provider (anthropic, gemini, or openai)",
+    )
     ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API Key")
+    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API Key")
+    OPENAI_API_KEY: str = Field(default="", description="OpenAI API Key")
     CLASSIFIER_MODEL: str = Field(
         default="claude-3-5-haiku-latest",
         description="Model identifier for ticket classification",
@@ -89,10 +95,33 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Google OAuth credentials must be provided in production"
                 )
-            if not self.ANTHROPIC_API_KEY:
+            if self.AI_PROVIDER == "anthropic" and not self.ANTHROPIC_API_KEY:
                 raise ValueError("ANTHROPIC_API_KEY must be provided in production")
+            elif self.AI_PROVIDER == "gemini" and not self.GEMINI_API_KEY:
+                raise ValueError("GEMINI_API_KEY must be provided in production")
+            elif self.AI_PROVIDER == "openai" and not self.OPENAI_API_KEY:
+                raise ValueError("OPENAI_API_KEY must be provided in production")
         return self
+
+
+def resolve_provider_model(model_name: str, provider: str = "anthropic") -> str:
+    """Resolve model name into Pydantic AI provider-prefixed format."""
+    if ":" in model_name:
+        return model_name
+
+    provider_clean = provider.strip().lower()
+    if provider_clean == "gemini":
+        return f"google:{model_name}"
+    elif provider_clean == "openai":
+        return f"openai:{model_name}"
+    return f"anthropic:{model_name}"
 
 
 # Global singleton settings instance
 settings = Settings()
+
+# Automatically sync GEMINI_API_KEY to os.environ for Pydantic AI Google provider
+if settings.GEMINI_API_KEY:
+    import os
+
+    os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY

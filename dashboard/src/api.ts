@@ -24,10 +24,19 @@ export interface TicketItem {
   customer: string;
   subject: string;
   category: string;
-  status: 'open' | 'answered' | 'escalated' | 'closed';
+  status: 'open' | 'answered' | 'escalated' | 'closed' | 'resolved';
   proposed_action?: string | null;
+  assigned_to?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TicketNote {
+  id: string;
+  ticket_id: string;
+  author: string;
+  note: string;
+  created_at: string;
 }
 
 export interface MessageItem {
@@ -124,6 +133,34 @@ class ApiClient {
 
   async triggerPoll(): Promise<{ status: string; processed: number }> {
     return this.request('/api/poll', { method: 'POST' });
+  }
+
+  async updateTicket(ticketId: string, updates: { status?: string; assigned_to?: string }): Promise<{ status: string; ticket: TicketItem }> {
+    return this.request(`/api/tickets/${ticketId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async sendManualReply(ticketId: string, body: string): Promise<{ status: string; message_id: string }> {
+    return this.request(`/api/tickets/${ticketId}/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    });
+  }
+
+  async getTicketNotes(ticketId: string): Promise<TicketNote[]> {
+    return this.request(`/api/tickets/${ticketId}/notes`);
+  }
+
+  async addTicketNote(ticketId: string, note: string): Promise<{ status: string; note_id: string }> {
+    return this.request(`/api/tickets/${ticketId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }),
+    });
   }
 }
 

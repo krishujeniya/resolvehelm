@@ -42,3 +42,42 @@ def test_production_password_guard():
             GOOGLE_REFRESH_TOKEN="dummy-token",
             ANTHROPIC_API_KEY="dummy-key",
         )
+
+
+def test_resolve_provider_model():
+    from app.config import resolve_provider_model
+
+    # Default Anthropic
+    assert (
+        resolve_provider_model("claude-3-5-haiku-latest", "anthropic")
+        == "anthropic:claude-3-5-haiku-latest"
+    )
+
+    # Gemini provider
+    assert (
+        resolve_provider_model("gemini-3.5-flash-lite", "gemini")
+        == "google:gemini-3.5-flash-lite"
+    )
+
+    # OpenAI provider
+    assert resolve_provider_model("gpt-4o", "openai") == "openai:gpt-4o"
+
+    # Already prefixed
+    assert (
+        resolve_provider_model("google-vertex:gemini-1.5-pro", "gemini")
+        == "google-vertex:gemini-1.5-pro"
+    )
+
+
+def test_production_provider_key_guard():
+    with pytest.raises(ValidationError, match="GEMINI_API_KEY must be provided"):
+        Settings(
+            APP_ENV="production",
+            AI_PROVIDER="gemini",
+            DASHBOARD_PASSWORD="super-secret-production-password",
+            GOOGLE_CLIENT_ID="dummy-id",
+            GOOGLE_CLIENT_SECRET="dummy-secret",
+            GOOGLE_REFRESH_TOKEN="dummy-token",
+            ANTHROPIC_API_KEY="dummy-key",
+            GEMINI_API_KEY="",
+        )

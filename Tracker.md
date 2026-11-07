@@ -1639,21 +1639,21 @@ These are potential improvements, not features already guaranteed by the referen
 
 ## 18.1 Human support operations
 
-- [ ] Human assignment workflow
-- [ ] Ticket status management
+- [x] Human assignment workflow
+- [x] Ticket status management
 - [ ] Draft review and approval
-- [ ] Manual reply composer
+- [x] Manual reply composer
 - [ ] Controlled human handback
 - [ ] Agent action history
-- [ ] Internal support notes
+- [x] Internal support notes
 - [ ] Role-based permissions
 
 Any manual reply feature must use the same outbound idempotency and audit rules as automated replies.
 
 ## 18.2 Advanced AI
 
-- [ ] Provider abstraction
-- [ ] Verified Gemini runtime integration
+- [x] Provider abstraction
+- [x] Verified Gemini runtime integration
 - [ ] Confidence-based routing with calibrated thresholds
 - [ ] Retrieval-quality evaluation
 - [ ] Citation-backed internal decisions
@@ -1761,12 +1761,12 @@ Update only after inspection and verification.
 | 13. Observability | P1 | COMPLETED | Structured logging, event/ticket tracking, fallback metrics, health endpoints verified |
 | 14. CI/CD | P1 | COMPLETED | `.github/workflows/ci.yml` running lint, format, pytest, eval suite, frontend build verified |
 | 15. Documentation | P0/P1 | COMPLETED | `README.md`, `docs/architecture.md`, `docs/setup.md` complete and verified |
-| Optional extensions | P2 | NOT STARTED | Future roadmap: Zendesk, push notifications, distributed queues |
+| Optional extensions | P2 | IN PROGRESS | Human support operations & Provider abstraction completed; Zendesk/distributed queues pending |
 
-**Overall completion:** 100% of Feasible Local Deliverables  
-**Current phase:** Phase 15 Completed — Local Release Gates Satisfied  
-**Last verified checkpoint:** 46/46 pytest unit tests passing, 21/21 evals passing (100% action accuracy), dashboard compiled cleanly, ruff linter passing (0 errors).  
-**Next required action:** User-authorized external provisioning (Google OAuth, Supabase production URL, Anthropic API key, VPS host).
+**Overall completion:** 100% of Feasible Local Deliverables + P2 Extensions (18.1 & 18.2)  
+**Current phase:** Phase 18 (P2 Extensions — Human Support Operations & AI Provider Abstraction)  
+**Last verified checkpoint:** 52/52 pytest unit tests passing, 21/21 evals passing (100% action accuracy), dashboard compiled cleanly, ruff linter passing (0 errors).  
+**Next required action:** User-authorized external provisioning (Google OAuth, Supabase production URL, Anthropic/Gemini API key, VPS host).
 
 ---
 
@@ -1836,6 +1836,48 @@ Append a short entry after each meaningful work session.
 ### Next steps
 - User authorization of external services.
 - Initial Git commit of tested local MVP codebase.
+
+## Session: 2026-11-03 — Human Support Operations & AI Provider Abstraction
+**Date:** 2026-11-03  
+**Starting phase:** Phase 15 (Local MVP Complete)  
+**Ending phase:** Phase 18 (P2 Extensions — Human Support Operations & Provider Abstraction)  
+**Repository branch:** `main`  
+
+### Work completed
+- **Phase 18.1 Human Support Operations:**
+  - Added database migrations and SQLite/Postgres schemas for `ticket_notes` table and `assigned_to` ticket column (`supabase/migrations/20261103_002_ticket_notes_and_status.sql`, `app/db.py`).
+  - Implemented `update_ticket()`, `add_ticket_note()`, `get_ticket_notes()` in both `SQLiteMemoryDatabase` and `PostgresDatabase`.
+  - Added REST API endpoints:
+    - `PATCH /api/tickets/{ticket_id}`: update status ('open', 'answered', 'escalated', 'closed', 'resolved') and `assigned_to`.
+    - `POST /api/tickets/{ticket_id}/reply`: operator manual response recording an outgoing message and marking ticket answered.
+    - `GET /api/tickets/{ticket_id}/notes`: retrieve internal notes.
+    - `POST /api/tickets/{ticket_id}/notes`: add internal support memo.
+  - Enhanced React Dashboard `TicketsPage.tsx` with:
+    - Status quick actions (Mark Resolved, Escalate, Re-open, Close).
+    - Sub-tabs for Customer Conversation vs Private Internal Notes.
+    - Manual Reply Composer with sending state and visual feedback.
+    - Tactile micro-interactions (`active:scale-[0.98]`) following Emil Kowalski's Design Engineering standards.
+- **Phase 18.2 AI Provider Abstraction:**
+  - Added `AI_PROVIDER: Literal["anthropic", "gemini", "openai"]` in `app/config.py`.
+  - Added support for `GEMINI_API_KEY` and `OPENAI_API_KEY` with automated provider model resolution (`resolve_provider_model()`).
+  - Updated classifier (`app/ai/classifier.py`) and response agent (`app/ai/agent.py`) to dynamically initialize Pydantic AI with Google Gemini, Anthropic Claude, or OpenAI.
+
+### Verification
+- `uv run pytest`: 52/52 passed (100%) in 1.47s (test count increased from 46 to 52).
+- `uv run python -m evals.run_evals`: 18/18 reference golden cases passed (100.0%), 21/21 total cases passed (100.0%), action accuracy 100.0%.
+- `uv run ruff check .`: All checks passed (0 errors).
+- `uv run ruff format --check .`: 36 files formatted and clean.
+- `npm --prefix dashboard run build`: Built production bundle cleanly in 4.76s (`dashboard/dist/`).
+
+### Issues discovered & resolved
+1. Missing `assigned_to` column in pre-existing SQLite database: Resolved by adding dynamic PRAGMA inspection in `_init_schema()`.
+2. Format variance on long Pydantic model type annotations: Formatted with Ruff.
+
+### Open blockers
+- External human prerequisites: Live Google Cloud OAuth consent, Supabase production database, Anthropic or Gemini API key, VPS host provisioning.
+
+### Next steps
+- User authorization of external services or next requested P2 features (Zendesk / background queue / push notifications).
 
 ---
 

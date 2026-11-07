@@ -74,7 +74,7 @@ export const App: React.FC = () => {
           <EventsPage events={events} loading={loading} onRefresh={loadAllData} />
         )}
         {currentTab === 'tickets' && (
-          <TicketsPage tickets={tickets} loading={loading} />
+          <TicketsPage tickets={tickets} loading={loading} onRefresh={loadAllData} />
         )}
         {currentTab === 'kb' && (
           <KnowledgeBasePage entries={kbEntries} onRefresh={loadAllData} />

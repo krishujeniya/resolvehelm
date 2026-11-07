@@ -5,7 +5,7 @@ import logging
 from pydantic_ai import Agent, RunContext
 
 from app.ai.schemas import AgentReply
-from app.config import settings
+from app.config import resolve_provider_model, settings
 from app.db import get_db
 
 logger = logging.getLogger(__name__)
@@ -33,12 +33,7 @@ Strict constraints:
 
 def create_response_agent() -> Agent[None, AgentReply]:
     """Create Pydantic AI agent equipped with knowledge base tools."""
-    model_name = settings.AGENT_MODEL
-    provider_model = (
-        f"anthropic:{model_name}"
-        if not model_name.startswith("anthropic:")
-        else model_name
-    )
+    provider_model = resolve_provider_model(settings.AGENT_MODEL, settings.AI_PROVIDER)
 
     agent = Agent(
         model=provider_model,
@@ -87,7 +82,7 @@ async def generate_agent_reply(
             f"Subject: {subject}\nCategory: {section}\n\nEmail Thread:\n{email_text}"
         )
         result = await agent.run(query)
-        return result.data
+        return getattr(result, "output", getattr(result, "data", None))
     except Exception as e:
         logger.warning("Agent run failed (%s); escalating safely", e)
         return AgentReply(
