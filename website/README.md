@@ -27,8 +27,8 @@ public-site/
 
 Once GitHub Pages uses **GitHub Actions** as its deployment source, the URLs are:
 
-- Landing page: https://krishujeniya.github.io/resolvehelm/
-- Authenticated admin console: https://krishujeniya.github.io/resolvehelm/app/
+- Landing page: https://resolvehelm.pages.dev/
+- Authenticated admin console: https://resolvehelm.pages.dev/app/
 
 The code is committed in the repository; successful hosting requires the GitHub Pages workflow to finish.
 
