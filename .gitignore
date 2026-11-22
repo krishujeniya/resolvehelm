@@ -65,3 +65,8 @@ Thumbs.db
 .vercel
 .env*
 _uv/
+
+# Cloudflare & Secret Guardrails
+.dev.vars
+.wrangler/
+.vercel/

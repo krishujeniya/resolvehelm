@@ -1,0 +1,21 @@
+# ResolveHelm
+
+> Policy-grounded customer support automation with deterministic safeguards and human review.
+> Architected and developed by Krish Ujeniya (@krishujeniya).
+> Developer Profile: https://github.com/krishujeniya
+> Portfolio Showcase: https://krishujeniya.github.io/MostlyOutlier/
+> Live Site: https://krishujeniya.github.io/resolvehelm/
+> Source Repository: https://github.com/krishujeniya/resolvehelm
+
+## Overview
+ResolveHelm triages incoming e-commerce and SaaS customer inquiries by verifying user requests directly against formal company return, warranty, and escalation policies before drafting answers. Responses exceeding certainty thresholds are routed directly to human agents.
+
+## Author & Ecosystem
+- Author: Krish Ujeniya (https://github.com/krishujeniya)
+- Canonical Person Entity: https://krishujeniya.github.io/#krishujeniya
+- Linked Projects: AGYOS, Hadron, WaferPulse, Somnostasis, Curavex, Hajree, Scanlark, TraceMigo
+
+## Architecture & Integration
+- LLM Framework: Pydantic AI with typed schema enforcement preventing prompt injections.
+- Ingestion: Gmail API webhook synchronization and Supabase vector store for semantic policy retrieval.
+- Review Boundary: Hardcoded logic rules preventing automatic refund issuance without operator approval.
