@@ -76,7 +76,7 @@ google-api-core==2.43.2
     # via google-api-python-client
 google-api-python-client==2.201.0
     # via resolvehelm-ai
-google-auth==2.62.0
+google-auth==2.63.1
     # via
     #   google-api-core
     #   google-api-python-client
