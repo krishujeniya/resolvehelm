@@ -259,7 +259,7 @@ pydantic==2.14.2
     #   resolvehelm-ai
 pydantic-ai==2.64.0
     # via resolvehelm-ai
-pydantic-ai-slim==2.64.0
+pydantic-ai-slim==2.74.0
     # via
     #   pydantic-ai
     #   pydantic-evals
