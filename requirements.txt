@@ -257,7 +257,7 @@ pydantic==2.14.2
     #   pydantic-graph
     #   pydantic-settings
     #   resolvehelm-ai
-pydantic-ai==2.64.0
+pydantic-ai==2.74.0
     # via resolvehelm-ai
 pydantic-ai-slim==2.64.0
     # via
